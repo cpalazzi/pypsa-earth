@@ -77,9 +77,11 @@ Details (and errors introduced through this heuristic) are discussed in the pape
     for all ``scenario`` s in the configuration file
     the rule :mod:`solve_network`.
 """
+import importlib
 import logging
 import os
 import re
+from collections.abc import Iterable as IterableABC
 from pathlib import Path
 
 import numpy as np
@@ -91,9 +93,83 @@ from linopy import merge
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from pypsa.optimization.abstract import optimize_transmission_expansion_iteratively
 from pypsa.optimization.optimize import optimize
+from typing import Callable, List
 
 logger = create_logger(__name__)
 pypsa.pf.logger.setLevel(logging.WARNING)
+
+
+def _normalise_module_path(path: str) -> str:
+    module_path = path.strip().replace("/", ".")
+    if module_path.endswith(".py"):
+        module_path = module_path[:-3]
+    return module_path
+
+
+def _as_hook_list(configured_hooks) -> List[str]:
+    if not configured_hooks:
+        return []
+    if isinstance(configured_hooks, str):
+        return [configured_hooks]
+    if not isinstance(configured_hooks, IterableABC):
+        raise TypeError(
+            "solving.options.extra_functionality must be a string or iterable"
+        )
+    return [hook for hook in configured_hooks if hook]
+
+
+def _describe_hook(func: Callable) -> str:
+    module = getattr(func, "__module__", "")
+    name = getattr(func, "__name__", repr(func))
+    return f"{module}.{name}".lstrip(".")
+
+
+def _load_hook_from_entry(entry: str) -> Callable:
+    module_path, separator, attribute = entry.partition("::")
+    if not separator or not attribute:
+        raise ValueError(
+            "Each extra_functionality entry must look like 'module.py::callable'"
+        )
+    module_name = _normalise_module_path(module_path)
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as exc:
+        raise ImportError(
+            f"Could not import module '{module_name}' for extra_functionality"
+        ) from exc
+    attr_name = attribute.strip()
+    try:
+        func = getattr(module, attr_name)
+    except AttributeError as exc:
+        raise AttributeError(
+            f"Module '{module_name}' does not define '{attr_name}'"
+        ) from exc
+    if not callable(func):
+        raise TypeError(
+            f"Configured extra_functionality '{entry}' is not callable"
+        )
+    return func
+
+
+def _load_configured_extra_hooks(configured_hooks) -> List[Callable]:
+    hooks: List[Callable] = []
+    for entry in _as_hook_list(configured_hooks):
+        hooks.append(_load_hook_from_entry(entry))
+    return hooks
+
+
+def _compose_extra_functionality(
+    default_hook: Callable, extra_hooks: List[Callable]
+) -> Callable:
+    if not extra_hooks:
+        return default_hook
+
+    def chained_hook(n, snapshots):
+        default_hook(n, snapshots)
+        for hook in extra_hooks:
+            hook(n, snapshots)
+
+    return chained_hook
 
 
 def get_load_shedding_capacity(n, safety_margin=1.2):
@@ -1106,7 +1182,16 @@ def solve_network(n, config, solving, **kwargs):
         solving["solver_options"][set_of_options] if set_of_options else {}
     )
     kwargs["solver_name"] = solving["solver"]["name"]
-    kwargs["extra_functionality"] = extra_functionality
+    extra_hooks = _load_configured_extra_hooks(cf_solving.get("extra_functionality"))
+    if extra_hooks:
+        logger.info(
+            "Loaded %s extra_functionality hook(s): %s",
+            len(extra_hooks),
+            ", ".join(_describe_hook(hook) for hook in extra_hooks),
+        )
+    kwargs["extra_functionality"] = _compose_extra_functionality(
+        extra_functionality, extra_hooks
+    )
 
     skip_iterations = cf_solving.get("skip_iterations", False)
     if not n.lines.s_nom_extendable.any():
