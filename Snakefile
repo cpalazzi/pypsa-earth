@@ -446,7 +446,12 @@ if config["enable"].get("retrieve_cost_data", True):
         resources:
             mem_mb=5000,
         run:
-            move(input[0], output[0])
+            src = input[0]
+            try:
+                src = src.local_path
+            except AttributeError:
+                pass
+            move(src, output[0])
 
 
 rule build_demand_profiles:
