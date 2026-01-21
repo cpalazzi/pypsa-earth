@@ -446,11 +446,7 @@ if config["enable"].get("retrieve_cost_data", True):
         resources:
             mem_mb=5000,
         run:
-            src = input[0]
-            try:
-                src = src.local_path
-            except AttributeError:
-                pass
+            src = input[0].local_path if hasattr(input[0], "local_path") else input[0]
             move(src, output[0])
 
 
