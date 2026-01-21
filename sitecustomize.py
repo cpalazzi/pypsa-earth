@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText:  PyPSA-Earth and PyPSA-Eur Authors
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Project-level runtime patches.
 
 This module is imported automatically by Python (if present on ``sys.path``)
