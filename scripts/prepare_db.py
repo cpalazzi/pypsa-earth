@@ -42,8 +42,6 @@ if __name__ == "__main__":
             planning_horizons="2030",
             sopts="144H",
             discountrate=0.071,
-            demand="AB",
-            h2export="120",
         )
 
     n0 = pypsa.Network(snakemake.input.network)
@@ -266,7 +264,7 @@ add_conv("urban central solid biomass CHP", "hv", 1, False, reg=True)
 add_conv("urban central solid biomass CHP CC", "hv", 1, False)
 
 add_store("battery", "hv", reg=True)
-add_store("battery storage", "hv")
+add_store("EV battery storage", "hv")
 add_store("home battery", "hv")
 
 add_storage("PHS", "hv")  # TODO commented out because there is no storage untis

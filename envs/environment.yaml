@@ -11,10 +11,10 @@ dependencies:
 - python>=3.10, <3.12  # 3.12 has weird issues with snakemake https://github.com/snakemake/snakemake/issues/2480
 - pip
 
-- pypsa>=0.25, <=0.30.3
-- atlite>=0.4.1
+- pypsa>=0.25.1, <=0.30.3
+- atlite=0.4.1 # in versions >0.4.1 the computation of availability matrix in `build_renewable_profiles` fails due to https://github.com/PyPSA/atlite/issues/301 https://github.com/PyPSA/atlite/issues/514 for countries whose cutouts span over geometries crossing the antimeridian
 - dask
-- powerplantmatching>=0.5.19  # due to this https://github.com/PyPSA/powerplantmatching/pull/202
+- powerplantmatching>=0.8
 - earth-osm>=2.3.post1
 
 # Dependencies of the workflow itself
@@ -28,7 +28,7 @@ dependencies:
 - pyscipopt
 - lxml
 - numpy<2
-- pandas
+- pandas<3
 - geopandas>=1
 - fiona>=1.10
 - xarray>=2023.11.0, <=2025.01.2
